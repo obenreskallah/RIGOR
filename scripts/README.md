@@ -1,24 +1,32 @@
 # Scripts
 
-Pure-Python (standard library only: `csv`, `json`, `collections`, `argparse`) — no installation required beyond Python 3.
+Tests 1–4 are Python 3.9+ **standard library only** (`csv`, `json`, `collections`, `argparse`, `statistics`). No install step.
 
-| Script | Purpose | Depends on |
+`extract_pidsmaker_predictions.py` is the exception: it imports **PyTorch** to read PIDSMaker `*.pth` files. Skip it if your predictions are already a CSV.
+
+| Script | Purpose | Config fields |
 |---|---|---|
-| `test1_graph_stats.py` | Recomputes mean/max node degree (k̄, k_max) directly from the edge list of each graph. | `datasets.json`: `path` |
-| `test2_prop2_geometric.py` | Direct geometric measurement of the 2-hop neighborhood size \|N2(v\*)\| for every ground-truth attack node, via breadth-first search. | `datasets.json`: `path`, `ground_truth_path`; imports `load_edges()` from `test1_graph_stats.py` |
-| `test3_p1_vs_p2_postprocessing.py` | Recomputes precision/recall under both the P1 (2-hop true-positive) and P2 (strict node-level) labeling criteria from a detector's raw per-node predictions. | `datasets.json`: `path`, `ground_truth_path`, `predictions_path`, `system` |
-| `test4_multiseed_aggregate.py` | Aggregates `test3`'s per-seed output into mean/std/relative-std across seeds. | output of `test3` |
-| `extract_pidsmaker_predictions.py` | Converts a PIDSMaker evaluation run's internal output into the flat per-node prediction CSV that `test3` expects. | a completed PIDSMaker run |
-| `map_gt_to_nids.py` | Maps raw ground-truth node UUIDs (as published by DARPA / Aurora-style labeling tools) to the integer node IDs used internally by the graph export. | your graph's UUID↔ID mapping |
+| `test1_graph_stats.py` | Mean/max degree (k̄, k_max) from the edge list | `path` |
+| `test2_prop2_geometric.py` | \|N₂(v*)\| for each ground-truth attack node (BFS) | `path`, `ground_truth_path` |
+| `test3_p1_vs_p2_postprocessing.py` | Precision/recall under P1 (2-hop) vs P2 (strict) | + `predictions_path`, `system` |
+| `test4_multiseed_aggregate.py` | Mean/std/relative-std of Test 3 across seeds | Test 3 CSV(s) |
+| `extract_pidsmaker_predictions.py` | PIDSMaker `result_*.pth` → `node_id,predicted_label,score` | a finished PIDSMaker eval dir or `--pth` |
+| `map_gt_to_nids.py` | DARPA/Aurora UUIDs → integer node IDs in the edge list | `--uuid-map` CSV `uuid,index_id` |
 
-## The one thing you need to adapt
+CLI flags are only `--config` / `--out` (Tests 1–3), plus `--summary-out` (Test 2) and `--inputs` (Test 4). There is no `--predictions-dir` and no `run_all_in_one.py`.
 
-`load_edges()` inside `test1_graph_stats.py` is the only piece of code that depends on your specific edge-list file format. `test2` and `test3` import it, so adapting it once is enough for all three. If your files need `pandas`, `pyarrow`, or `networkx` to load, add that inside `load_edges()` / `load_predictions()` without touching the rest of the scripts — the CLI, CSV output, and statistics logic are format-agnostic.
+## The one function to adapt
 
-## Config format
+`load_edges()` in `test1_graph_stats.py` is the only format-specific loader. `test2` and `test3` import it. If your export is not CSV `src,dst`, JSONL, or `{"edges": [...]}`, change that function once.
 
-Copy `datasets.example.json` to `datasets.json` and fill in real paths — see the file for the exact schema (one object per dataset/host/split, with `path`, `ground_truth_path`, and, for Test 3 only, `predictions_path` + `system`).
+## Config
 
-## Quick check
+Copy `datasets.example.json` → `datasets.json`. One object per (dataset, host, split). The CSVs published with this paper use `"split": "full"`. Optional top-level `"seeds": [0, 1, 2]` expands `{seed}` in `predictions_path` for Test 3.
 
-Every script accepts `--help` and prints progress to stderr, which matters for large files (E3-THEIA's test edge list is ~9.4M edges). Try the smallest dataset you have first (FiveDirections or CADETS) before running against THEIA/ClearScope, to confirm `load_edges()` is correctly adapted before committing to a longer run.
+Test 3 **skips** entries that have no `predictions_path` without printing a line. If the output CSV is header-only, the config was incomplete, not a successful empty experiment.
+
+## Checks before a long run
+
+- IDs in the edge list, ground truth, and predictions must be the same strings. A high “attack nodes absent from graph” count on stderr means you still need `map_gt_to_nids.py`.
+- RAM scales with \|V\| + unique neighbours (full adjacency). Try the smallest host first.
+- Test 2’s `ratio_mean_n2_over_k_bar2` is often ≫ 1 on DARPA graphs; that is not a failed run.

@@ -1,45 +1,55 @@
 {
-  "_comment": "Exemple de configuration. Copie ce fichier en datasets.json et remplace les 'path' par tes vrais chemins. Un objet par (dataset, host, split) que tu veux traiter.",
+  "_comment": "Copy to datasets.json and replace paths. One object per (dataset, host, split). Paper CSVs use split=full, not test/train.",
+
+  "seeds": [0, 1, 2],
 
   "datasets": [
     {
       "dataset": "E3",
       "host": "CADETS",
-      "split": "test",
-      "path": "/path/to/e3_cadets_test_edges.csv",
-      "ground_truth_path": "/path/to/e3_cadets_attack_nodes.txt",
-      "_comment_predictions": "n'ajoute predictions_path et system que pour le Test 3, une fois PIDSMAKER installe et un premier run termine",
-      "predictions_path": "/path/to/pidsmaker_outputs/threatrace_cadets_predictions.csv",
+      "split": "full",
+      "path": "/path/to/e3_cadets_edges.csv",
+      "ground_truth_path": "/path/to/e3_cadets_attack_node_ids.txt",
+      "predictions_path": "/path/to/predictions/threatrace_cadets_seed{seed}.csv",
       "system": "THREATRACE"
     },
     {
       "dataset": "E3",
+      "host": "CADETS",
+      "split": "full",
+      "path": "/path/to/e3_cadets_edges.csv",
+      "ground_truth_path": "/path/to/e3_cadets_attack_node_ids.txt",
+      "predictions_path": "/path/to/predictions/magic_cadets_seed{seed}.csv",
+      "system": "MAGIC"
+    },
+    {
+      "dataset": "E3",
       "host": "THEIA",
-      "split": "test",
-      "path": "/path/to/e3_theia_test_edges.csv",
-      "ground_truth_path": "/path/to/e3_theia_attack_nodes.txt"
+      "split": "full",
+      "path": "/path/to/e3_theia_edges.csv",
+      "ground_truth_path": "/path/to/e3_theia_attack_node_ids.txt"
     },
     {
       "dataset": "E3",
       "host": "CLEARSCOPE",
-      "split": "test",
-      "path": "/path/to/e3_clearscope_test_edges.csv",
-      "ground_truth_path": "/path/to/e3_clearscope_attack_nodes.txt"
+      "split": "full",
+      "path": "/path/to/e3_clearscope_edges.csv",
+      "ground_truth_path": "/path/to/e3_clearscope_attack_node_ids.txt"
     },
     {
       "dataset": "E3",
       "host": "FIVEDIRECTIONS",
-      "split": "test",
-      "path": "/path/to/e3_fivedirections_test_edges.csv",
-      "ground_truth_path": "/path/to/e3_fivedirections_attack_nodes.txt"
+      "split": "full",
+      "path": "/path/to/e3_fivedirections_edges.csv",
+      "ground_truth_path": "/path/to/e3_fivedirections_attack_node_ids.txt"
     },
     {
       "dataset": "PROVATTACK",
       "host": "PROVATTACK1",
       "split": "full",
-      "path": "/path/to/provattack1_edges.csv",
+      "path": "/path/to/provattack1_edges.jsonl",
       "ground_truth_path": "/path/to/provattack1_aurora_labels.txt",
-      "_comment": "Test 5: labels Aurora (Definition 7 du papier), pas le ground truth DARPA TC standard"
+      "_comment": "Aurora-style labels (protocol P3 / Definition 7), not the default DARPA TC node list"
     }
   ]
 }
