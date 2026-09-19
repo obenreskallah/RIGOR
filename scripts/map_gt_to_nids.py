@@ -1,4 +1,14 @@
-"""Mappe les UUIDs du ground truth vers les index_id PIDSMaker."""
+"""Map ground-truth UUIDs to PIDSMaker index_id values.
+
+Usage:
+    python scripts/map_gt_to_nids.py \
+        --uuid-map /path/to/uuid_to_index.csv \
+        --gt-files /path/to/raw_gt.txt \
+        --out /path/to/attack_node_ids.txt
+
+`--uuid-map` is a two-column CSV `uuid,index_id`.
+"""
+
 import argparse
 import csv
 from pathlib import Path
@@ -52,7 +62,7 @@ def main():
     Path(args.out).parent.mkdir(parents=True, exist_ok=True)
     with open(args.out, "w") as f:
         f.write("\n".join(nids) + ("\n" if nids else ""))
-    print(f"[GT] {n_uuid} UUIDs, {len(nids)} index_id, {n_miss} absents -> {args.out}")
+    print(f"[GT] {n_uuid} UUIDs, {len(nids)} index_id, {n_miss} missing -> {args.out}")
 
 
 if __name__ == "__main__":

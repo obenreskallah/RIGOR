@@ -2,22 +2,30 @@ cff-version: 1.2.0
 message: "If you use this repository (scripts, results, or the RIGOR checklist), please cite the paper below."
 title: "RIGOR: Reporting Instrument for Graph-based, Objective, Reproducible evaluation — companion repository for \"Bounding the Illusion\""
 type: software
+repository-code: "https://github.com/obenreskallah/RIGOR"
+license: MIT
 authors:
   - family-names: Benreskallah
     given-names: Oussama
-    # TODO (avant publication) : ajoutez votre ORCID et affiliation exacte, ex.
-    # orcid: "https://orcid.org/0000-0000-0000-0000"
-    # affiliation: "ESI Algiers"
+    email: o_benreskallah@esi.dz
+    affiliation: "Laboratoire de la Communication dans les Systèmes Informatiques (LCSI), École Nationale Supérieure d'Informatique (ESI, ex-INI), Oued Smar, Alger 16058, Algérie"
+    # TODO: ajouter l'ORCID si vous en avez un (aucun trouve publiquement lors de la verification)
   - family-names: Seba
     given-names: Hamida
-    # TODO: vérifier prénom complet, ORCID, affiliation (LIRIS, Univ. Lyon 1 ?)
+    email: hamida.seba@liris.cnrs.fr
+    affiliation: "Laboratoire d'InfoRmatique en Image et Systèmes d'information (LIRIS), UMR5205 CNRS/INSA Lyon/Université Claude Bernard Lyon 1/Université Lumière Lyon 2/École Centrale de Lyon, Équipe GOAL, Villeurbanne, France"
+    # ORCID trouve par recherche publique (nom + domaine de recherche compatibles) -- A VERIFIER par vous avant publication :
+    # orcid: "https://orcid.org/0000-0003-0670-815X"
   - family-names: Hidouci
     given-names: Walid-Khaled
-    # TODO: vérifier prénom complet, ORCID, affiliation
+    email: w_hidouci@esi.dz
+    affiliation: "Laboratoire de la Communication dans les Systèmes Informatiques (LCSI), École Nationale Supérieure d'Informatique (ESI, ex-INI), Oued Smar, Alger 16058, Algérie"
+    # TODO: ajouter l'ORCID si vous en avez un (aucun trouve publiquement lors de la verification)
   - family-names: Amrouche
-    given-names: Karim
-    # TODO: vérifier prénom complet, ORCID, affiliation
-license: MIT
+    given-names: Karima
+    email: k_amrouche@esi.dz
+    affiliation: "Laboratoire de la Communication dans les Systèmes Informatiques (LCSI), École Nationale Supérieure d'Informatique (ESI, ex-INI), Oued Smar, Alger 16058, Algérie"
+    # TODO: ajouter l'ORCID si vous en avez un (aucun trouve publiquement lors de la verification)
 preferred-citation:
   type: article
   title: "Bounding the Illusion: A Formal and Empirical Account of Precision Inflation, Reproducibility, and Robustness in Provenance-Based Intrusion Detection"
@@ -32,4 +40,4 @@ preferred-citation:
     - family-names: Hidouci
       given-names: Walid-Khaled
     - family-names: Amrouche
-      given-names: Karim
+      given-names: Karima

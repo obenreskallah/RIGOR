@@ -1,40 +1,22 @@
 """
-Test 3 -- Recalcul controle de la precision/rappel sous P1 (2-hop tolerant) et
-P2 (strict, noeud exact) a partir des MEMES predictions brutes d'un systeme
-(ex: sortie de PIDSMAKER pour THREATRACE, MAGIC, etc.).
+Test 3 — precision/recall under P1 (2-hop) vs P2 (strict node-level)
+from the same raw per-node predictions.
 
-C'est le script qui produit un facteur d'inflation (IF) empirique de premiere
-main: IF = precision_P1 / precision_P2, calcule sur un seul run, pas sur des
-chiffres pris a des papiers differents.
+IF = precision_P1 / precision_P2 on a single run.
 
-Definitions utilisees (coherentes avec le papier, section Formal Background,
-et avec la formulation d'EA-THGN / FLASH / THREATRACE):
-  - P2 (strict): un noeud predit malveillant est un vrai positif ssi il est
-    LUI-MEME dans le ground truth V_attack.
-  - P1 (2-hop tolerant, cote precision): un noeud predit malveillant est un
-    vrai positif ssi il est dans V_attack OU dans le voisinage a 2 hops d'un
-    noeud de V_attack (c-a-d dans l'ensemble "ground truth etendu").
-  - P1 (2-hop tolerant, cote rappel): un noeud de V_attack est considere
-    "detecte" ssi au moins un noeud flagge par le systeme se trouve dans son
-    propre voisinage a 2 hops (ou est lui-meme).
+- P2: a flagged node is a true positive iff it is itself in V_attack.
+- P1 (precision): a flagged node is a true positive iff it is in V_attack
+  or in the 2-hop neighbourhood of some node in V_attack.
+- P1 (recall): an attack node is detected iff at least one flagged node
+  lies in its 2-hop neighbourhood (or is itself).
 
 Usage:
-    python test3_p1_vs_p2_postprocessing.py \
-        --config datasets.json \
-        --predictions-dir /path/to/pidsmaker/outputs \
-        --out p1_vs_p2_results.csv
+    python test3_p1_vs_p2_postprocessing.py --config datasets.json --out p1_vs_p2_results.csv
 
-`datasets.json` doit contenir, pour chaque (dataset,host,split) evalue, un
-champ "predictions_path" pointant vers le fichier de predictions du systeme
-(un fichier par (systeme, dataset, host, split) -- adapte `load_predictions()`
-au format exact que produit ta version de PIDSMAKER : par defaut ce script
-attend un CSV "node_id,predicted_label[,score]").
-
-Reutilise build_adjacency() et load_attack_nodes() de test2 -- si tu as deja
-lance le Test 2 sur le meme dataset, tu peux reutiliser le graphe charge en
-memoire dans le meme run pour eviter de le reconstruire (voir la variante
-`run_all_in_one.py` plus bas dans le dossier scripts/ si tu veux fusionner
-Tests 1-3 en un seul passage sur les gros graphes).
+Each evaluated entry needs `path`, `ground_truth_path`, `predictions_path`,
+and `system`. Predictions default to CSV `node_id,predicted_label[,score]`.
+Optional top-level `"seeds"` with `{seed}` in `predictions_path` expands
+one entry across seeds.
 """
 
 import argparse
@@ -49,19 +31,12 @@ from test2_prop2_geometric import build_adjacency, load_attack_nodes
 
 
 def load_predictions(path: str):
-    """
-    ADAPTE CETTE FONCTION AU FORMAT DE SORTIE DE TA VERSION DE PIDSMAKER.
-
-    Doit retourner un set des node_id predits comme malveillants (label==1
-    ou score >= seuil, selon ce que PIDSMAKER expose directement -- utilise
-    de preference leur decision finale deja seuillee, pas le score brut, pour
-    rester coherent avec les chiffres qu'ils rapportent nativement).
-    """
+    """Return the set of node IDs flagged malicious (already-thresholded labels)."""
     p = Path(path)
     flagged = set()
     with open(p, "r", newline="") as f:
         reader = csv.reader(f)
-        header = next(reader, None)
+        next(reader, None)
         for row in reader:
             if len(row) < 2:
                 continue
@@ -72,7 +47,7 @@ def load_predictions(path: str):
 
 
 def expand_ground_truth_2hop(adj, attack_nodes):
-    """Union de {v} U N_2(v) pour tout v dans attack_nodes -- 'ground truth etendu'."""
+    """Union of {v} ∪ N_2(v) over attack nodes (extended ground truth)."""
     expanded = set()
     for v in attack_nodes:
         if v not in adj:
@@ -93,7 +68,7 @@ def expand_ground_truth_2hop(adj, attack_nodes):
 
 
 def recall_p1_detected_count(adj, attack_nodes, flagged):
-    """Nombre de noeuds d'attaque 'detectes' au sens P1: >=1 noeud flagge dans leur voisinage 2-hop (ou eux-memes)."""
+    """Attack nodes with ≥1 flagged node in their 2-hop neighbourhood (or themselves)."""
     detected = 0
     for v in attack_nodes:
         if v not in adj:
@@ -128,14 +103,12 @@ def compute_p1_p2(adj, attack_nodes_all, flagged):
     attack_in_graph = {v for v in attack_nodes_all if v in adj}
     flagged_in_graph = {v for v in flagged if v in adj}
 
-    # --- P2 strict ---
     tp2 = flagged_in_graph & attack_in_graph
     fp2 = flagged_in_graph - attack_in_graph
     fn2 = attack_in_graph - flagged_in_graph
     precision_p2 = len(tp2) / len(flagged_in_graph) if flagged_in_graph else 0.0
     recall_p2 = len(tp2) / len(attack_in_graph) if attack_in_graph else 0.0
 
-    # --- P1 2-hop tolerant ---
     expanded_gt = expand_ground_truth_2hop(adj, attack_in_graph)
     tp1_for_precision = flagged_in_graph & expanded_gt
     fp1 = flagged_in_graph - expanded_gt
@@ -160,8 +133,8 @@ def compute_p1_p2(adj, attack_nodes_all, flagged):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", required=True,
-                     help="datasets.json avec 'path' (aretes), 'ground_truth_path', "
-                          "'predictions_path', et 'system' pour chaque entree evaluee")
+                     help="datasets.json with path, ground_truth_path, "
+                          "predictions_path, and system on each evaluated entry")
     ap.add_argument("--out", default="p1_vs_p2_results.csv")
     args = ap.parse_args()
 
@@ -187,6 +160,9 @@ def main():
             pred_path = item.get("predictions_path")
             gt_path = item.get("ground_truth_path")
             if not pred_path or not gt_path:
+                print(f"[Test 3] SKIP {item.get('system', '?')}/{item['dataset']}/{item['host']}: "
+                      f"missing predictions_path or ground_truth_path.",
+                      file=sys.stderr)
                 continue
 
             edge_path = resolve_path(item["path"], args.config)
@@ -197,7 +173,7 @@ def main():
             if seed != "":
                 label += f"/seed{seed}"
             if not paths_exist(edge_path) or not paths_exist(gt_path) or not paths_exist(pred_path):
-                print(f"[Test 3] SKIP {label}: fichier manquant (edges/gt/predictions).",
+                print(f"[Test 3] SKIP {label}: missing file (edges/gt/predictions).",
                       file=sys.stderr)
                 continue
 
@@ -230,10 +206,10 @@ def main():
         w.writeheader()
         w.writerows(rows)
 
-    print(f"\n[Test 3] Termine. Resultats dans {args.out}", file=sys.stderr)
-    print("Rappel: compare la colonne IF_empirical a ceiling_k_bar2 du Test 1 "
-          "pour le meme dataset -- IF_empirique devrait rester du meme ordre "
-          "de grandeur ou en-dessous (Proposition 2 est une borne superieure).",
+    print(f"\n[Test 3] Done. Results in {args.out}", file=sys.stderr)
+    print("Note: compare IF_empirical to Test 1 ceiling_k_bar2 on the same "
+          "dataset — empirical IF should be of similar order or below "
+          "(Proposition 2 is an upper bound).",
           file=sys.stderr)
 
 

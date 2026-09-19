@@ -1,21 +1,16 @@
 """
-Agregation multi-seed (Test 3 et Test 4).
+Test 4 — multi-seed aggregation of Test 3.
 
-Les seeds multiples s'appliquent a CHAQUE combinaison systeme x dataset du
-scope, pas seulement a CADETS : sinon les autres hosts n'auraient qu'un
-point (seed=0) et pas de barre d'erreur.
-
-Accepte soit un CSV unique produit par test3_p1_vs_p2_postprocessing.py
-(colonne seed, une ligne par seed), soit plusieurs CSV (un par seed).
+Accepts one Test 3 CSV (seed column, one row per seed) or several CSVs
+(one per seed). Aggregates every (system, dataset, host, split) pair.
 
 Usage:
     python test4_multiseed_aggregate.py \
         --inputs results/p1_vs_p2_results.csv \
         --out results/multiseed_stability.csv
 
-Calcule, pour chaque (system, dataset, host, split) : moyenne et ecart-type
-de precision_P1, precision_P2, recall_P1, recall_P2, IF_empirical, et
-sigma_tilde (Bilot2025b Eq. 3) sur precision_P2.
+Reports mean, std, and relative std (sigma_tilde, Bilot 2025b Eq. 3) for
+precision_P1/P2, recall_P1/P2, and IF_empirical.
 """
 
 import argparse
@@ -37,12 +32,12 @@ def load_csv(path):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--inputs", nargs="+", required=True,
-                     help="CSV P1/P2 (un fichier avec colonne seed, ou un fichier par seed)")
+                     help="P1/P2 CSV (one file with a seed column, or one file per seed)")
     ap.add_argument("--out", default="multiseed_stability.csv")
     args = ap.parse_args()
 
     if len(args.inputs) < 1:
-        ap.error("fournir au moins un CSV")
+        ap.error("provide at least one CSV")
 
     n_seed_hint = len(args.inputs)
     grouped = defaultdict(lambda: defaultdict(list))
@@ -58,9 +53,9 @@ def main():
                     grouped[key][col].append(float(val))
 
     if n_seed_hint < 3:
-        print("[Test 4] ATTENTION: moins de 3 seeds — l'écart-type n'est pas "
-              "informatif. Le scope du papier vise seeds 0/1/2 sur CHAQUE "
-              "combinaison système×dataset, pas seulement CADETS.",
+        print("[Test 4] WARNING: fewer than 3 seeds — std. dev. is not "
+              "informative. This paper archives seeds 0/1/2 on every "
+              "system×dataset pair, not CADETS only.",
               file=sys.stderr)
 
     out_rows = []
@@ -94,10 +89,10 @@ def main():
         w.writeheader()
         w.writerows(out_rows)
 
-    print(f"[Test 4] Termine ({len(args.inputs)} fichiers agreges). "
-          f"Resultats dans {args.out}", file=sys.stderr)
-    print("Rappel: sigma_tilde_pct sur precision_P2_sigma_tilde_pct est "
-          "directement comparable a la Figure 7 de Bilot2025b (sigma_ADP).",
+    print(f"[Test 4] Done ({len(args.inputs)} file(s) aggregated). "
+          f"Results in {args.out}", file=sys.stderr)
+    print("Note: precision_P2_sigma_tilde_pct is comparable to Figure 7 "
+          "of Bilot 2025b (sigma_ADP).",
           file=sys.stderr)
 
 

@@ -1,15 +1,15 @@
-"""Convertit les resultats PIDSMaker (results.pth / result_epoch_*.pth) en CSV
-node_id,predicted_label,score pour le Test 3.
+"""Convert PIDSMaker results (results.pth / result_*.pth) to the CSV
+node_id,predicted_label,score that Test 3 expects.
 
-Choisit l'epoch de meilleure ADP si on pointe vers un dossier d'evaluation.
+When given an evaluation directory, keeps the epoch with the best ADP.
 
 Usage:
-    python scripts/extract_pidsmaker_predictions.py \\
-        --eval-dir /path/to/artifacts/evaluation/evaluation/<hash>/CADETS_E3 \\
+    python scripts/extract_pidsmaker_predictions.py \
+        --eval-dir /path/to/artifacts/evaluation/evaluation/<hash>/CADETS_E3 \
         --out results/predictions/threatrace_CADETS_E3_seed0.csv
 
-    python scripts/extract_pidsmaker_predictions.py \\
-        --pth /path/to/result_epoch_5.pth \\
+    python scripts/extract_pidsmaker_predictions.py \
+        --pth /path/to/result_epoch_5.pth \
         --out results/predictions/threatrace_CADETS_E3_seed0.csv
 """
 
@@ -30,7 +30,7 @@ def pick_best_result_pth(eval_dir: Path) -> Path:
         results = eval_dir / "results" / "results.pth"
         if results.exists():
             return results
-        raise FileNotFoundError(f"Pas de precision_recall_dir ni results.pth dans {eval_dir}")
+        raise FileNotFoundError(f"No precision_recall_dir or results.pth in {eval_dir}")
 
     best_adp = float("-inf")
     best_path = None
@@ -43,8 +43,8 @@ def pick_best_result_pth(eval_dir: Path) -> Path:
             best_adp = adp
             best_path = result_file
     if best_path is None:
-        raise FileNotFoundError(f"Aucun result_*.pth dans {pr_dir}")
-    print(f"[extract] epoch retenue (meilleure ADP={best_adp}): {best_path}")
+        raise FileNotFoundError(f"No result_*.pth in {pr_dir}")
+    print(f"[extract] selected epoch (best ADP={best_adp}): {best_path}")
     return best_path
 
 
@@ -60,23 +60,23 @@ def results_to_rows(obj):
                 continue
             rows.append((str(nid), int(rec["y_hat"]), float(rec.get("score", 0.0))))
         return rows
-    raise TypeError(f"Format PIDSMaker non reconnu: {type(obj)}")
+    raise TypeError(f"Unrecognized PIDSMaker format: {type(obj)}")
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--eval-dir", help="Dossier CADETS_E3 (ou autre) sous artifacts/evaluation/")
-    ap.add_argument("--pth", help="Fichier result_*.pth ou results.pth")
+    ap.add_argument("--eval-dir", help="Host folder (e.g. CADETS_E3) under artifacts/evaluation/")
+    ap.add_argument("--pth", help="result_*.pth or results.pth file")
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
 
     if bool(args.eval_dir) == bool(args.pth):
-        raise SystemExit("Specifier exactement un de --eval-dir ou --pth")
+        raise SystemExit("Specify exactly one of --eval-dir or --pth")
 
     src = Path(args.pth) if args.pth else pick_best_result_pth(Path(args.eval_dir))
     rows = results_to_rows(_load_torch(src))
     if not rows:
-        raise SystemExit(f"Aucune prediction extraite de {src}")
+        raise SystemExit(f"No predictions extracted from {src}")
 
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -85,7 +85,7 @@ def main():
         w.writerow(["node_id", "predicted_label", "score"])
         w.writerows(rows)
     n_flagged = sum(1 for _, y, _ in rows if y == 1)
-    print(f"[extract] {len(rows)} noeuds, {n_flagged} flagges -> {out}")
+    print(f"[extract] {len(rows)} nodes, {n_flagged} flagged -> {out}")
 
 
 if __name__ == "__main__":

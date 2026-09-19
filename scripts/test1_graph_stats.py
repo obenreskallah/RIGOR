@@ -1,48 +1,16 @@
 """
-Test 1 -- Recensement des statistiques de graphe (k_bar, k_max) par dataset.
+Test 1 — graph-degree statistics (k_bar, k_max) per dataset.
 
 Usage:
     python test1_graph_stats.py --config datasets.json --out graph_stats.csv
 
-Ce script est volontairement agnostique du format exact de tes fichiers de
-graphe : la SEULE fonction à adapter est `load_edges()` ci-dessous. Tout le
-reste (comptage, calcul de k_bar/k_max, export CSV) est générique et ne
-nécessite aucune modification.
+The only format-specific function is `load_edges()`. Counting, k_bar/k_max,
+and CSV export are generic.
 
-Format attendu de `datasets.json` (à créer toi-même) :
-{
-  "datasets": [
-    {"dataset": "E3", "host": "CADETS", "split": "train", "path": "/path/to/e3_cadets_train_edges.csv"},
-    {"dataset": "E3", "host": "CADETS", "split": "test",  "path": "/path/to/e3_cadets_test_edges.csv"},
-    {"dataset": "E3", "host": "THEIA",  "split": "train", "path": "..."},
-    ...
-    {"dataset": "PROVATTACK", "host": "PROVATTACK1", "split": "full", "path": "..."}
-  ]
-}
-
-Chaque entrée pointe vers UN fichier contenant les arêtes du graphe pour ce
-(dataset, host, split). Le format interne du fichier (CSV, JSON-lines,
-pickle...) est géré par `load_edges()` -- adapte-le a ton pipeline de
-pretraitement DARPA TC / PIDSMAKER.
-
-Conçu pour tourner sur un MacBook sans GPU : le calcul est O(|E|) en temps et
-O(|V|) en mémoire pour les degrés (pas besoin de charger le graphe entier en
-mémoire si `load_edges` est un générateur -- voir la variante "streaming" plus
-bas pour les tres gros fichiers, ex. E3-Theia test: ~9.4M arêtes).
-
-CORRECTIF (voir aussi test2_prop2_geometric.py) : `build_adjacency()` est
-maintenant defini UNE SEULE FOIS ici et importe par test2 -- avant ce
-correctif, test1 calculait k_max sur le degre DIRIGE brut (out+in, sans
-dedupliquer les aretes multiples/reciproques), tandis que test2 le calculait
-sur une adjacence non dirigee dedupliquee (des sets) pour son propre usage
-interne (BFS a 2 sauts). Les deux scripts rapportaient donc deux notions de
-"k_max" differentes (jusqu'a ~400x d'ecart sur CADETS/THEIA/CLEARSCOPE) alors
-que k_bar (= |E|/|V|, insensible a cette distinction) restait identique entre
-les deux -- d'ou l'illusion de coherence. Definition 1 du papier modelise le
-graphe de provenance par $E \\subseteq V \\times V$ (un ENSEMBLE, pas un
-multi-ensemble) : c'est la version dedupliquee (celle que test2 utilisait
-deja pour son propre BFS) qui est correcte. Les deux scripts partagent
-desormais EXACTEMENT le meme calcul de k_max -- ils ne peuvent plus diverger.
+`k_bar` uses the raw event count |E|/|V| (KAIROS / EA-THGN / Eq. (4); not
+doubled). `k_max` is the max degree in the undirected, deduplicated graph
+(Definition 1: E ⊆ V × V is a set). Both conventions are shared with Test 2
+via `build_adjacency()`.
 """
 
 import argparse
@@ -57,7 +25,7 @@ EDGE_SUFFIXES = {".csv", ".jsonl", ".ndjson", ".json"}
 
 
 def resolve_path(raw, config_file):
-    """Resout un chemin (ou une liste) par rapport au dossier de datasets.json."""
+    """Resolve a path (or list of paths) relative to the datasets.json directory."""
     cfg_dir = Path(config_file).resolve().parent
 
     def one(p):
@@ -81,15 +49,11 @@ def paths_exist(resolved):
 
 
 def load_edges(path):
-    """
-    Generateur d'aretes (src_id, dst_id). Accepte un fichier, un dossier, ou
-    une liste de chemins.
+    """Yield (src_id, dst_id) from a file, directory, or list of paths.
 
-    Formats geres:
-      - CSV `src,dst[,...]` (entete optionnelle)
-      - JSONL PROVATTACK (`logType=EVENT`, champs `logData.s` / `logData.d`)
-      - JSONL generique (`src`/`dst`)
-      - JSON `{"edges": [[src, dst], ...]}`
+    Formats: CSV `src,dst[,…]` (optional header); PROVATTACK JSONL
+    (`logType=EVENT`, `logData.s` / `logData.d`); generic JSONL `{src, dst}`;
+    JSON `{"edges": [[src, dst], …]}`.
     """
     if isinstance(path, (list, tuple)):
         for p in path:
@@ -98,21 +62,20 @@ def load_edges(path):
 
     p = Path(path)
     if not p.exists():
-        raise FileNotFoundError(f"Fichier d'aretes introuvable: {path}")
+        raise FileNotFoundError(f"Edge file not found: {path}")
 
     if p.is_dir():
         files = sorted(f for f in p.iterdir() if f.suffix.lower() in EDGE_SUFFIXES)
         if not files:
-            raise FileNotFoundError(f"Aucun fichier d'aretes dans {path}")
+            raise FileNotFoundError(f"No edge files in {path}")
         for f in files:
             yield from load_edges(str(f))
         return
 
     suffix = p.suffix.lower()
     if suffix == ".csv":
-        import csv as _csv
         with open(p, "r", newline="") as f:
-            reader = _csv.reader(f)
+            reader = csv.reader(f)
             first = next(reader, None)
             if first is None:
                 return
@@ -145,15 +108,15 @@ def load_edges(path):
             for rec in obj:
                 yield from _edges_from_json_record(rec)
         else:
-            raise NotImplementedError(f"Structure JSON non geree pour {path}")
+            raise NotImplementedError(f"Unhandled JSON structure for {path}")
     else:
         raise NotImplementedError(
-            f"Format non gere pour {path} -- ajoute un branch dans load_edges()."
+            f"Unhandled format for {path} — extend load_edges()."
         )
 
 
 def _edges_from_json_record(obj):
-    """Une ligne JSONL -> 0 a N aretes. PROVATTACK d'abord, puis cles generiques."""
+    """One JSONL record → 0..N edges. PROVATTACK EVENT records first, then generic keys."""
     log_type = obj.get("logType")
     if log_type == "NODE":
         return
@@ -162,7 +125,7 @@ def _edges_from_json_record(obj):
         src, dst, d2 = log.get("s"), log.get("d"), log.get("d2")
         if src and dst:
             yield str(src), str(dst)
-        # FileIoRenamePath: PIDSMaker ajoute aussi <s,d2> et <d,d2>
+        # FileIoRenamePath: PIDSMaker also emits <s,d2> and <d,d2>
         if d2 and src:
             yield str(src), str(d2)
         if d2 and dst:
@@ -177,21 +140,11 @@ def _edges_from_json_record(obj):
 
 
 def build_adjacency(path):
-    """Une seule passe sur les aretes -> (adj, n_edges).
+    """One pass over edges → (adj, n_edges).
 
-    `adj` est un dict {node: set(voisins)} NON DIRIGE et DEDUPLIQUE (chaque
-    arete src->dst ajoute src aux voisins de dst ET dst aux voisins de src ;
-    un `set.add` sur une paire deja vue est un no-op) -- coherent avec la
-    Definition 1 du papier ($E \\subseteq V \\times V$ est un ENSEMBLE).
-
-    `n_edges` est le nombre BRUT d'evenements traites (sans deduplication),
-    utilise uniquement pour k_bar = |E|/|V| (convention KAIROS / EA-THGN /
-    Eq. (4) du papier -- chaque evenement compte comme une arete, k_bar
-    n'est PAS multiplie par 2).
-
-    Fonction PARTAGEE avec test2_prop2_geometric.py (qui l'utilise pour son
-    BFS a 2 sauts) -- ne pas dupliquer cette logique ailleurs : c'est
-    precisement la duplication qui a cause l'incoherence corrigee ici.
+    `adj` is undirected and deduplicated ({node: set(neighbours)}), matching
+    Definition 1. `n_edges` is the raw event count (no dedup), used only for
+    k_bar = |E|/|V|. Shared with Test 2 for the 2-hop BFS.
     """
     adj = defaultdict(set)
     n_edges = 0
@@ -200,25 +153,15 @@ def build_adjacency(path):
         adj[dst].add(src)
         n_edges += 1
         if n_edges % 2_000_000 == 0:
-            print(f"  ... {n_edges:,} aretes indexees", file=sys.stderr)
+            print(f"  ... {n_edges:,} edges indexed", file=sys.stderr)
     return adj, n_edges
 
 
 def compute_stats(path: str):
-    """Une seule passe sur les aretes (via build_adjacency): k_bar sur le
-    compte brut d'evenements, k_max/percentiles sur le degre non dirige
-    deduplique -- la MEME adjacence que celle utilisee par le BFS de Test 2."""
+    """k_bar from the raw event count; k_max/percentiles from undirected degree."""
     adj, n_edges = build_adjacency(path)
     n_nodes = len(adj)
-
-    # Proposition 2 du papier: k_bar = |E|/|V| (chaque evenement = une arete).
-    # Ne PAS multiplier par 2 -- c'est la convention KAIROS / EA-THGN / Eq. (4).
     k_bar = (n_edges / n_nodes) if n_nodes else 0.0
-
-    # k_max et percentiles: degre dans le graphe simple non dirige deduplique
-    # (voir docstring de build_adjacency). Avant le correctif, ce bloc
-    # utilisait un degre dirige brut (out+in, non deduplique), incoherent
-    # avec test2 et avec Definition 1 du papier.
     degree_values = sorted(len(v) for v in adj.values())
     k_max = degree_values[-1] if degree_values else 0
 
@@ -236,7 +179,7 @@ def compute_stats(path: str):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--config", required=True, help="Chemin vers datasets.json")
+    ap.add_argument("--config", required=True, help="Path to datasets.json")
     ap.add_argument("--out", default="graph_stats.csv")
     args = ap.parse_args()
 
@@ -248,7 +191,7 @@ def main():
         edge_path = resolve_path(entry["path"], args.config)
         if not paths_exist(edge_path):
             print(f"[Test 1] SKIP {entry['dataset']}/{entry['host']}/{entry['split']}: "
-                  f"fichier d'aretes absent ({edge_path}). Exporte d'abord le dump Postgres.",
+                  f"edge file missing ({edge_path}).",
                   file=sys.stderr)
             continue
         print(f"[Test 1] {entry['dataset']}/{entry['host']}/{entry['split']} ...", file=sys.stderr)
@@ -272,7 +215,7 @@ def main():
         writer.writeheader()
         writer.writerows(rows)
 
-    print(f"\n[Test 1] Termine. Resultats dans {args.out}", file=sys.stderr)
+    print(f"\n[Test 1] Done. Results in {args.out}", file=sys.stderr)
 
 
 if __name__ == "__main__":
