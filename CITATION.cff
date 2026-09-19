@@ -1,0 +1,35 @@
+cff-version: 1.2.0
+message: "If you use this repository (scripts, results, or the RIGOR checklist), please cite the paper below."
+title: "RIGOR: Reporting Instrument for Graph-based, Objective, Reproducible evaluation — companion repository for \"Bounding the Illusion\""
+type: software
+authors:
+  - family-names: Benreskallah
+    given-names: Oussama
+    # TODO (avant publication) : ajoutez votre ORCID et affiliation exacte, ex.
+    # orcid: "https://orcid.org/0000-0000-0000-0000"
+    # affiliation: "ESI Algiers"
+  - family-names: Seba
+    given-names: Hamida
+    # TODO: vérifier prénom complet, ORCID, affiliation (LIRIS, Univ. Lyon 1 ?)
+  - family-names: Hidouci
+    given-names: Walid-Khaled
+    # TODO: vérifier prénom complet, ORCID, affiliation
+  - family-names: Amrouche
+    given-names: Karim
+    # TODO: vérifier prénom complet, ORCID, affiliation
+license: MIT
+preferred-citation:
+  type: article
+  title: "Bounding the Illusion: A Formal and Empirical Account of Precision Inflation, Reproducibility, and Robustness in Provenance-Based Intrusion Detection"
+  journal: "Computers & Security"
+  status: "under review"
+  year: 2026
+  authors:
+    - family-names: Benreskallah
+      given-names: Oussama
+    - family-names: Seba
+      given-names: Hamida
+    - family-names: Hidouci
+      given-names: Walid-Khaled
+    - family-names: Amrouche
+      given-names: Karim
